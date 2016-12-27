@@ -40,7 +40,7 @@ python manage.py makemigrations
 ```
 
 ## example
-visit ```http://yourhost/admin/api_gateway/api/``` to add/edit/delete your restful apis
+visit ```http://yourhost/admin/apigateway/api/``` to add/edit/delete your restful apis
 
 
 eg: 
