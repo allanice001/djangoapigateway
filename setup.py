@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'djangoapigateway',
-    version = '0.0.1',
+    version = '0.0.4',
     keywords = ('django', 'apigateway', 'dataproxy'),
     description = 'apigateway for django',
     license = 'MIT License',
@@ -14,6 +14,6 @@ setup(
 
     packages = find_packages(),
     include_package_data = True,
-    platforms = 'linux',
-    install_requires = ['django', 'rest_framework', 'requests']
+    platforms = 'unix like',
+    install_requires = []
 )

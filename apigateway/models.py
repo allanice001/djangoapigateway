@@ -32,7 +32,11 @@ class Api(models.Model):
             
         elif self.plugin == 1:
             auth = BasicAuthentication()
-            user, password = auth.authenticate(request)
+            try:
+                user, password = auth.authenticate(request)
+            except:
+                return False, 'Authentication credentials were not provided'
+
             if self.consumers.filter(user=user):
                 return True, ''
             else:
@@ -50,13 +54,12 @@ class Api(models.Model):
     def send_request(self, request):
         headers = {}
         if self.plugin != 1 and request.META.get('HTTP_AUTHORIZATION'):
-            headers['authorization'] = request.META.get('HTTP_AUTHORIZATION'), 
+            headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
         headers['content-type'] = request.content_type
 
         strip = '/service' + self.request_path
         full_path = request.get_full_path()[len(strip):]
         url = self.upstream_url + full_path
-
         method = request.method.lower()
         method_map = {
             'get': requests.get,
