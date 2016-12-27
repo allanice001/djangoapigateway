@@ -8,9 +8,9 @@ setup(
     description = 'apigateway for django',
     license = 'MIT License',
 
-    url = '',
+    url = 'https://github.com/sarar04/djangoapigateway',
     author = 'sarar04',
-    author = 'sarar04@163.com',
+    author_email = 'sarar04@163.com',
 
     packages = find_packages(),
     include_package_data = True,

@@ -8,6 +8,7 @@ This is a simple apigateway for django to transmit restful api.
 * Python(2.7)
 * Django(1.8)
 * requests
+* djangorestframework
 
 ## Installation
 Install using pip         
@@ -15,11 +16,12 @@ Install using pip
 pip install djangoapigateway
 ```
 
-Add 'apigateway' to your INSTALLED_APPS setting.
+Add 'apigateway' and 'rest_framework' to your INSTALLED_APPS setting.
 ```
     INSTALL_APPS = (
         ...
         'apigateway',
+        'rest_framework',
     )
 ```
 
