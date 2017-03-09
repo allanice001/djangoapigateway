@@ -24,7 +24,11 @@ class gateway(APIView):
             return Response(msg, status=status.HTTP_400_BAD_REQUEST)
 
         res = apimodel[0].send_request(request)
-        return Response(data=res.json(), status=res.status_code)
+        if res.headers.get('Content-Type', '').lower() == 'application/json':
+            data = res.json()
+        else:
+            data = res.content
+        return Response(data=data, status=res.status_code)
     
     def get(self, request):
         return self.operation(request)
