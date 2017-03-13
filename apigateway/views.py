@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from models import Api
+from .models import Api
 
 class gateway(APIView):
     authentication_classes = ()

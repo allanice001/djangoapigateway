@@ -1,8 +1,8 @@
 *.pyc
 *.sqlite3
-migrations/
 !__init__.py
 !*/
 dist/
 *.egg-info/
 .DS_Store
+migrations/

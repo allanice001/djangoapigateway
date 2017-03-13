@@ -1,5 +1,5 @@
 from django.contrib import admin
-from models import Api, Consumer
+from .models import Api, Consumer
 
 # Register your models here.
 admin.site.register(Api)

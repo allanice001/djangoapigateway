@@ -14,6 +14,9 @@ class Consumer(models.Model):
     def __unicode__(self):
         return self.user.username
 
+    def __str__(self):
+        return self.user.username
+
 class Api(models.Model):
     PLUGIN_CHOICE_LIST  = (
         (0, _('Remote auth')),
@@ -88,4 +91,7 @@ class Api(models.Model):
         return method_map[method](url, headers=headers, data=data, files=request.FILES)
 
     def __unicode__(self):
+        return self.name
+
+    def __str__(self):
         return self.name
