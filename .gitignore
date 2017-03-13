@@ -3,3 +3,6 @@
 migrations/
 !__init__.py
 !*/
+dist/
+*.egg-info/
+.DS_Store

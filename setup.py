@@ -8,8 +8,8 @@ setup(
     description = 'apigateway for django',
     license = 'MIT License',
 
-    url = 'https://github.com/sarar04/djangoapigateway',
-    author = 'sarar04',
+    url = 'https://github.com/ecidi/djangoapigateway',
+    author = 'ecidi',
     author_email = 'sarar04@163.com',
 
     packages = find_packages(),
