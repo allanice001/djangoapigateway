@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from .models import Api
 
 
-_logger = logging.get('apigateway')
+_logger = logging.getLogger('apigateway')
 
 
 class gateway(APIView):

@@ -7,3 +7,6 @@ dist/
 .DS_Store
 migrations/
 /.idea
+/gateway
+.sqlite3
+/manage.py
