@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
-import requests, json
-from django.db import models
+from datetime import datetime
+from wsgiref.util import is_hop_by_hop
+
+import json
+import requests
 from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
+from django.db import models
 from django.utils.translation import ugettext_lazy as _
-from rest_framework.authentication import get_authorization_header, BasicAuthentication
-from rest_framework import HTTP_HEADER_ENCODING
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.authentication import BasicAuthentication
+from rest_framework.response import Response
+
 
 # Create your models here.
 class Consumer(models.Model):
@@ -41,8 +46,10 @@ class Api(models.Model):
     )
     TIME_OUT = 30
     name = models.CharField(max_length=128, unique=True)
-    request_path = models.CharField(max_length=255)
-    upstream_url = models.URLField(max_length=255)
+    request_path = models.CharField(max_length=255,
+                                    validators=[RegexValidator(regex='^/', message=_('Should starts with "/".'))])
+    upstream_url = models.URLField(max_length=255,
+                                   validators=[RegexValidator(regex='^.+[^/]$', message=_('Should not ends with ".".'))])
     plugin = models.IntegerField(choices=PLUGIN_CHOICE_LIST, default=0)
     consumers = models.ManyToManyField(Consumer, blank=True)
     authorizers = models.ManyToManyField(Authorizer, blank=True)
@@ -93,7 +100,7 @@ class Api(models.Model):
             return False, Response("plugin %d not implemented" % self.plugin, status=status.HTTP_501_NOT_IMPLEMENTED)
 
     def send_request(self, request):
-        headers = {}
+        headers = {key[5:]: value for key, value in request.META.items() if key.startswith('HTTP_')}
         if self.plugin != 1 and request.META.get('HTTP_AUTHORIZATION'):
             headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
         # headers['content-type'] = request.content_type
@@ -113,13 +120,31 @@ class Api(models.Model):
         for k,v in request.FILES.items():
             request.data.pop(k)
         
-        if request.content_type and request.content_type.lower()=='application/json':
+        if request.content_type and request.content_type.lower() == 'application/json':
             data = json.dumps(request.data)
             headers['content-type'] = request.content_type
         else:
             data = request.data
+        headers.pop('ACCEPT')
+        response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
+        response = self.to_rest_response(request, response)
+        return response
 
-        return method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
+    SET_COOKIE_NAME = 'Set-Cookie'
+
+    def to_rest_response(self, request, response):
+        if response.headers.get('Content-Type', '').lower() == 'application/json':
+            data = response.json()
+        else:
+            data = response.content
+        headers = {key: response.headers[key] for key in response.headers if not is_hop_by_hop(key)}
+        cookie_header = headers.pop(self.SET_COOKIE_NAME, None)
+        cookies = response.cookies
+        response = Response(data=data, status=response.status_code, headers=headers)
+        for c in cookies:
+            response.set_cookie(key=c.name, value=c.value, expires=datetime.utcfromtimestamp(c.expires), path=c.path,
+                                secure=c.secure, httponly='HttpOnly' in c._rest or False)
+        return response
 
     def __unicode__(self):
         return self.name
