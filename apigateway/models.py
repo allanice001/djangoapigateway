@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 from wsgiref.util import is_hop_by_hop
-
 import json
 import requests
 from django.contrib.auth.models import User
@@ -11,6 +10,7 @@ from django.utils.translation import ugettext_lazy as _
 from rest_framework import status
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.response import Response
+from .cookies import StringMorsel
 
 
 # Create your models here.
@@ -96,14 +96,17 @@ class Api(models.Model):
                         headers[key] = value
                 response = requests.post(authenticator.remote_url, headers=headers, timeout=self.TIME_OUT)
                 authed = response.headers.get(self.AUTHED_HEADER_NAME)
+                print('response.headers', response.headers)
+                print('response.json()', response.json())
                 if authed is None:
                     return False, 'authorized header needed'
                 elif authed:
                     # return {headers}
                     data = response.json()
+                    data = data.get('ret') or data
                     return True, data
                 else:
-                    return False, response
+                    return False, self.to_rest_response(response)
         else:
             return False, Response("plugin %d not implemented" % self.plugin, status=status.HTTP_501_NOT_IMPLEMENTED)
 
@@ -137,23 +140,23 @@ class Api(models.Model):
         if 'headers' in extra:
             headers.update(extra['headers'])
         response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
-        response = self.to_rest_response(request, response)
+        response = self.to_rest_response(response)
         return response
 
     SET_COOKIE_NAME = 'Set-Cookie'
 
-    def to_rest_response(self, request, response):
+    def to_rest_response(self, response):
         if response.headers.get('Content-Type', '').lower() == 'application/json':
             data = response.json()
         else:
             data = response.content
         headers = {key: response.headers[key] for key in response.headers if not is_hop_by_hop(key)}
         cookie_header = headers.pop(self.SET_COOKIE_NAME, None)
-        cookies = response.cookies
+        raw_cookies = response.raw.headers.getlist(self.SET_COOKIE_NAME)
         response = Response(data=data, status=response.status_code, headers=headers)
-        for c in cookies:
-            response.set_cookie(key=c.name, value=c.value, expires=datetime.utcfromtimestamp(c.expires), path=c.path,
-                                secure=c.secure, httponly='HttpOnly' in c._rest or False)
+        for raw_cookie in raw_cookies:
+            response.cookies[raw_cookie] = StringMorsel(raw_cookie)
+
         return response
 
     def __unicode__(self):
