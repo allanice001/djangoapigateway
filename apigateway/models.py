@@ -25,7 +25,7 @@ class Consumer(models.Model):
         return self.user.username
 
 
-class Authorizer(models.Model):
+class Authenticator(models.Model):
     remote_url = models.URLField(max_length=255)
     headers = models.CharField(max_length=255)  # separated by ','
 
@@ -45,6 +45,7 @@ class Api(models.Model):
         (4, _('Middle auth')),
     )
     TIME_OUT = 30
+    AUTHED_HEADER_NAME = 'X-AUTHED'
     name = models.CharField(max_length=128, unique=True)
     request_path = models.CharField(max_length=255,
                                     validators=[RegexValidator(regex='^/', message=_('Should starts with "/".'))])
@@ -52,7 +53,7 @@ class Api(models.Model):
                                    validators=[RegexValidator(regex='^.+[^/]$', message=_('Should not ends with ".".'))])
     plugin = models.IntegerField(choices=PLUGIN_CHOICE_LIST, default=0)
     consumers = models.ManyToManyField(Consumer, blank=True)
-    authorizers = models.ManyToManyField(Authorizer, blank=True)
+    authenticators = models.ManyToManyField(Authenticator, blank=True)
 
     def check_plugin(self, request):
         if self.plugin == 0:
@@ -83,23 +84,30 @@ class Api(models.Model):
             request.META['HTTP_AUTHORIZATION'] = requests.auth._basic_auth_str(consumer[0].user.username, consumer[0].apikey)
             return True, ''
         elif self.plugin == 4:
-            authorizer = self.authorizers.all()
-            if not authorizer:
+            authenticator = self.authenticators.all()
+            if not authenticator:
                 return False, 'authorizer need'
             else:
-                authorizer = authorizer[0]
+                authenticator = authenticator[0]
                 headers = dict()
-                for key in authorizer.headers.split(','):
-                    value = request.headers.get(key)
-                    if value is None:
-                        return False, 'header %s needed' % key
-                    else:
+                for key in authenticator.headers.split(','):
+                    value = request.META.get('HTTP_' + key.upper())
+                    if value is not None:
                         headers[key] = value
-                return True, request.post(authorizer.remote_url, headers=headers, timeout=self.TIME_OUT)
+                response = requests.post(authenticator.remote_url, headers=headers, timeout=self.TIME_OUT)
+                authed = response.headers.get(self.AUTHED_HEADER_NAME)
+                if authed is None:
+                    return False, 'authorized header needed'
+                elif authed:
+                    # return {headers}
+                    data = response.json()
+                    return True, data
+                else:
+                    return False, response
         else:
             return False, Response("plugin %d not implemented" % self.plugin, status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    def send_request(self, request):
+    def send_request(self, request, extra={}):
         headers = {key[5:]: value for key, value in request.META.items() if key.startswith('HTTP_')}
         if self.plugin != 1 and request.META.get('HTTP_AUTHORIZATION'):
             headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
@@ -126,6 +134,8 @@ class Api(models.Model):
         else:
             data = request.data
         headers.pop('ACCEPT')
+        if 'headers' in extra:
+            headers.update(extra['headers'])
         response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
         response = self.to_rest_response(request, response)
         return response

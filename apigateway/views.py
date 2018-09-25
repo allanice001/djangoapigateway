@@ -32,8 +32,10 @@ class gateway(APIView):
             else:
                 response = message
             return response
-
-        response = apimodel.send_request(request)
+        extra = None
+        if isinstance(message, dict):
+            extra = message
+        response = apimodel.send_request(request, extra)
         return response
 
     def operation(self, request):
