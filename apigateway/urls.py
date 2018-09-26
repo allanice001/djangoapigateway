@@ -4,5 +4,5 @@ from django.conf.urls import include, url
 from . import views
 
 urlpatterns = [
-    url(r'.*', views.gateway.as_view())
+    url(r'.*', views.Gateway.as_view())
 ]

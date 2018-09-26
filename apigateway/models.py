@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 from wsgiref.util import is_hop_by_hop
-import json, re
+import json, re, os
 import requests
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
@@ -28,7 +28,8 @@ class Consumer(models.Model):
 
 class Authenticator(models.Model):
     remote_url = models.URLField(max_length=255)
-    headers = models.CharField(max_length=255)  # separated by ','
+    headers = models.CharField(max_length=255,   # separated by ','
+                            validators=[RegexValidator(regex='^[A-Z\-,]*$', message=_('Uppercase separated by ",".'))])
 
     def __unicode__(self):
         return self.remote_url
@@ -51,7 +52,7 @@ class Api(models.Model):
     request_path = models.CharField(max_length=255,
                                     validators=[RegexValidator(regex='^/', message=_('Should starts with "/".'))])
     upstream_url = models.URLField(max_length=255,
-                                   validators=[RegexValidator(regex='^.+[^/]$', message=_('Should not ends with ".".'))])
+                                   validators=[RegexValidator(regex='^.+[^/]$', message=_('Should not ends with "/".'))])
     plugin = models.IntegerField(choices=PLUGIN_CHOICE_LIST, default=0)
     consumers = models.ManyToManyField(Consumer, blank=True)
     authenticators = models.ManyToManyField(Authenticator, blank=True)
@@ -92,13 +93,11 @@ class Api(models.Model):
                 authenticator = authenticator[0]
                 headers = dict()
                 for key in authenticator.headers.split(','):
-                    value = request.META.get('HTTP_' + key.upper())
+                    value = request.headers.get(key)
                     if value is not None:
                         headers[key] = value
                 response = requests.post(authenticator.remote_url, headers=headers, timeout=self.TIME_OUT)
                 authed = response.headers.get(self.AUTHED_HEADER_NAME)
-                print('response.headers', response.headers)
-                print('response.json()', response.json())
                 if authed is None:
                     return False, 'authorized header needed'
                 elif authed:
@@ -111,15 +110,14 @@ class Api(models.Model):
         else:
             return False, Response("plugin %d not implemented" % self.plugin, status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    def send_request(self, request, extra={}):
-        headers = {key[5:]: value for key, value in request.META.items() if key.startswith('HTTP_')}
-        if self.plugin != 1 and request.META.get('HTTP_AUTHORIZATION'):
-            headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
-        # headers['content-type'] = request.content_type
+    def send_request(self, request, prefix, params, extra={}):
+        headers = request.headers.copy()
 
-        strip = settings.SERVICE_PATH + self.request_path
-        full_path = request.get_full_path()[len(strip):]
-        url = self.upstream_url + full_path
+        strip_length = len(settings.SERVICE_PATH) + len(prefix)
+        full_path = request.get_full_path()[strip_length:]
+        if full_path and not full_path.startswith('/'):
+            full_path = '/' + full_path
+        url = self.upstream_url.format(**params) + full_path
         method = request.method.lower()
         method_map = {
             'get': requests.get,
@@ -134,13 +132,14 @@ class Api(models.Model):
         
         if request.content_type and request.content_type.lower() == 'application/json':
             data = json.dumps(request.data)
-            headers['content-type'] = request.content_type
+            headers['CONTENT-TYPE'] = request.content_type
         else:
             data = request.data
         headers.pop('ACCEPT')
         if 'headers' in extra:
             headers.update(extra['headers'])
         headers.pop('HOST', None)
+        # print('url', url)
         response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
         response = self.to_rest_response(response)
         return response

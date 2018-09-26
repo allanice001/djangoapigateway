@@ -1,30 +1,55 @@
 # -*- coding: utf-8 -*-
-import requests, logging
+import requests, logging, re
 from django.shortcuts import render
 from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from .models import Api
+from . import settings
 
 
 _logger = logging.getLogger('apigateway')
 
 
-class gateway(APIView):
+class Gateway(APIView):
     authentication_classes = ()
+
+    param_regex = re.compile(r'\{(.+?)\}')
+
+    @classmethod
+    def extract_params(cls, path, prefix):
+        """
+        :param path:
+        :param prefix:
+        :return: None if not match, otherwise {params, prefix}
+        """
+        pattern = cls.param_regex.sub('(.+?)', prefix)
+        values_match = re.match(pattern, path)
+        if values_match is None:
+            return values_match
+        params = dict()
+        names = cls.param_regex.findall(prefix)
+        for index, name in enumerate(names):
+            params[name] = values_match.groups()[index]
+        span = values_match.span()
+        return dict(params=params, prefix=path[span[0]:span[1]])
 
     def do_operation(self, request):
         path = request.path_info.split('/')
-        if len(path) < 2:
-            return Response('bad request', status=status.HTTP_400_BAD_REQUEST)
+        if len(path) < 3:
+            return Response('bad path length', status=status.HTTP_400_BAD_REQUEST)
 
         apimodel = Api.objects.filter(name=path[2])
         if len(apimodel) != 1:
-            print('path', path)
-            return Response('bad request', status=status.HTTP_400_BAD_REQUEST)
+            return Response('bad service', status=status.HTTP_400_BAD_REQUEST)
 
         apimodel = apimodel[0]
+        extract = self.extract_params(request.path_info[len(settings.SERVICE_PATH):], apimodel.request_path)
+        if not extract:
+            return Response('bad path pattern', status=status.HTTP_400_BAD_REQUEST)
+
+        request.headers = {key[5:].replace('_', '-'): value for key, value in request.META.items() if key.startswith('HTTP_')}
         valid, message = apimodel.check_plugin(request)
         if not valid:
             if not isinstance(message, Response):
@@ -35,7 +60,7 @@ class gateway(APIView):
         extra = {}
         if isinstance(message, dict):
             extra = message
-        response = apimodel.send_request(request, extra)
+        response = apimodel.send_request(request, extract['prefix'], extract['params'], extra)
         return response
 
     def operation(self, request):
