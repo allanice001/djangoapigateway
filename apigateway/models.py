@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 from wsgiref.util import is_hop_by_hop
-import json
+import json, re
 import requests
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
@@ -116,7 +116,7 @@ class Api(models.Model):
             headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
         # headers['content-type'] = request.content_type
 
-        strip = '/service' + self.request_path
+        strip = '/s' + self.request_path
         full_path = request.get_full_path()[len(strip):]
         url = self.upstream_url + full_path
         method = request.method.lower()
@@ -145,6 +145,7 @@ class Api(models.Model):
         return response
 
     SET_COOKIE_NAME = 'Set-Cookie'
+    regex = re.compile('Domain=[^;]*;?\s?')
 
     def to_rest_response(self, response):
         if response.headers.get('Content-Type', '').lower() == 'application/json':
@@ -156,6 +157,7 @@ class Api(models.Model):
         raw_cookies = response.raw.headers.getlist(self.SET_COOKIE_NAME)
         response = Response(data=data, status=response.status_code, headers=headers)
         for raw_cookie in raw_cookies:
+            raw_cookie = self.regex.sub('', raw_cookie)
             response.cookies[raw_cookie] = StringMorsel(raw_cookie)
 
         return response
