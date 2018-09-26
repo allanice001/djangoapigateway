@@ -139,6 +139,7 @@ class Api(models.Model):
         headers.pop('ACCEPT')
         if 'headers' in extra:
             headers.update(extra['headers'])
+        headers.pop('HOST', None)
         response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
         response = self.to_rest_response(response)
         return response
