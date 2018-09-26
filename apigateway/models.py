@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.authentication import BasicAuthentication
 from rest_framework.response import Response
 from .cookies import StringMorsel
+from . import settings
 
 
 # Create your models here.
@@ -116,7 +117,7 @@ class Api(models.Model):
             headers['authorization'] = request.META.get('HTTP_AUTHORIZATION')
         # headers['content-type'] = request.content_type
 
-        strip = '/s' + self.request_path
+        strip = settings.SERVICE_PATH + self.request_path
         full_path = request.get_full_path()[len(strip):]
         url = self.upstream_url + full_path
         method = request.method.lower()
