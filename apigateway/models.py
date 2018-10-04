@@ -153,7 +153,10 @@ class Api(models.Model):
     regex = re.compile('Domain=[^;]*;?\s?')
 
     def to_rest_response(self, response):
-        if response.headers.get('Content-Type', '').lower() == 'application/json':
+        content_type = response.headers.get('Content-Type', '').lower()
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug('Content-Type: %s' % content_type)
+        if content_type == 'application/json':
             data = response.json()
         else:
             data = response.content
