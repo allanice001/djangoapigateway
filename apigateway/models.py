@@ -156,7 +156,7 @@ class Api(models.Model):
         content_type = response.headers.get('Content-Type', '').lower()
         if _logger.isEnabledFor(logging.DEBUG):
             _logger.debug('Content-Type: %s' % content_type)
-        if content_type == 'application/json':
+        if content_type.startswith('application/json'):
             data = response.json()
         else:
             data = response.content
