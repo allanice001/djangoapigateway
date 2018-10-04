@@ -2,7 +2,7 @@
 from datetime import datetime
 from wsgiref.util import is_hop_by_hop
 import json, re, os
-import requests
+import requests, logging
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.db import models
@@ -12,6 +12,9 @@ from rest_framework.authentication import BasicAuthentication
 from rest_framework.response import Response
 from .cookies import StringMorsel
 from . import settings
+
+
+_logger = logging.getLogger('apigateway')
 
 
 # Create your models here.
@@ -96,6 +99,7 @@ class Api(models.Model):
                     value = request.headers.get(key)
                     if value is not None:
                         headers[key] = value
+                _logger.debug('Authenticating via: %s' % authenticator.remote_url)
                 response = requests.post(authenticator.remote_url, headers=headers, timeout=self.TIME_OUT)
                 authed = response.headers.get(self.AUTHED_HEADER_NAME)
                 if authed is None:
@@ -140,6 +144,7 @@ class Api(models.Model):
             headers.update(extra['headers'])
         headers.pop('HOST', None)
         # print('url', url)
+        _logger.debug('Forward request: %s' % url)
         response = method_map[method](url, headers=headers, data=data, files=request.FILES, timeout=self.TIME_OUT)
         response = self.to_rest_response(response)
         return response
